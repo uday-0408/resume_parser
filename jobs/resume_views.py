@@ -5,6 +5,7 @@ from .utils import extract_text_from_pdf
 
 def get_resume(request):
     resume_id = request.GET.get("resume_id")
+    print(f"resume id: ", resume_id)
     try:
         resume = Resume.objects.get(id=resume_id)
         file_path = resume.file.path

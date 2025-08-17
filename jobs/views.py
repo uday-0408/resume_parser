@@ -12,6 +12,95 @@ from rest_framework import status
 from .models import Job, Resume
 from .serializer import JobSerializer, ResumeSerializer
 from .utils import extract_text_from_pdf
+import tempfile
+
+
+@csrf_exempt
+def groq_match_resume_job(request):
+    if request.method == "POST":
+        # Accepts multipart/form-data: resume file and job_description
+        resume_file = request.FILES.get("resume")
+        job_description = request.POST.get("job_description")
+        if not resume_file or not job_description:
+            return JsonResponse(
+                {"error": "Missing resume file or job description."}, status=400
+            )
+
+        # Save the uploaded resume temporarily
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            for chunk in resume_file.chunks():
+                tmp.write(chunk)
+            resume_path = tmp.name
+
+        try:
+            resume_text = extract_text_from_pdf(resume_path)
+        except Exception as e:
+            return JsonResponse(
+                {"error": f"Failed to extract text from resume: {str(e)}"}, status=400
+            )
+        finally:
+            os.remove(resume_path)
+
+        GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+        }
+
+        prompt = f"""
+        You are an advanced ATS (Applicant Tracking System) assistant specializing in software and IT jobs.
+        Read the resume and job description, then return a detailed JSON analysis with the following:
+
+        1. rank → Match score from 0–100 showing how well the resume fits the job.
+        2. skills → List of all hard (technical) and soft skills found in the resume.
+        3. total_experience → Total professional experience in years (approximate if needed).
+        4. project_category → Categories or domains of projects in the resume (e.g., AI, Web Development, Cloud, Data Science, Mobile Apps, etc.).
+        5. missing_skills → List of important skills in the job description that are not clearly mentioned in the resume.
+        6. improvement_suggestions → Actionable ways the candidate can improve the resume for better ATS and recruiter match rates.
+
+        Resume:
+        {resume_text}
+
+        Job Description:
+        {job_description}
+
+        Respond ONLY with valid JSON in the exact structure below:
+        {{
+            "rank": <number>,
+            "skills": ["skill1", "skill2", ...],
+            "total_experience": <number>,
+            "project_category": ["category1", "category2", ...],
+            "missing_skills": ["skill1", "skill2", ...],
+            "improvement_suggestions": ["suggestion1", "suggestion2", ...]
+        }}
+        """
+
+        payload = {
+            "model": "deepseek-r1-distill-llama-70b",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a highly accurate and concise job matching assistant.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+        }
+
+        groq_resp = requests.post(url, headers=headers, json=payload)
+        print("Groq API raw response:", groq_resp.text)
+
+        try:
+            match = groq_resp.json()["choices"][0]["message"]["content"]
+        except Exception:
+            match = (
+                f"Could not get a response from Groq. Raw response: {groq_resp.text}"
+            )
+
+        return JsonResponse({"match": match})
 
 
 @csrf_exempt
