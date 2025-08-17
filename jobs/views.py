@@ -1,17 +1,53 @@
-import pdfplumber
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from django.shortcuts import render
 import json
 import os
 import requests
 from dotenv import load_dotenv
-from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
-from django.shortcuts import render
 from rest_framework import generics
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Job, Resume
 from .serializer import JobSerializer, ResumeSerializer
+from .utils import extract_text_from_pdf
+
+
+@csrf_exempt
+def paginated_jobs(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            page_no = int(data.get("page_no", 1))
+            page_size = int(data.get("page_size", 10))
+            if page_no < 1 or page_size < 1:
+                return JsonResponse(
+                    {"error": "page_no and page_size must be positive integers."},
+                    status=400,
+                )
+            start = (page_no - 1) * page_size
+            end = start + page_size
+            jobs = Job.objects.all()[start:end]
+            jobs_data = [
+                {
+                    "id": job.pk,
+                    "title": job.title,
+                    "company": job.company,
+                    "location": job.location,
+                    "description": job.description,
+                }
+                for job in jobs
+            ]
+            return JsonResponse(
+                {"jobs": jobs_data, "page_no": page_no, "page_size": page_size},
+                status=200,
+            )
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+    else:
+        return JsonResponse({"error": "Only POST requests are allowed."}, status=405)
+
 
 # Load environment variables from .env file
 load_dotenv(
@@ -19,12 +55,7 @@ load_dotenv(
 )
 
 
-def extract_text_from_pdf(file_path):
-    text = ""
-    with pdfplumber.open(file_path) as pdf:
-        for page in pdf.pages:
-            text += (page.extract_text() or "") + "\n"
-    return text.strip()
+# Using the utility function from utils.py instead
 
 
 @csrf_exempt

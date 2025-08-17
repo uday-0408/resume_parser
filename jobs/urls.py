@@ -1,19 +1,9 @@
-# from django.urls import path, include
-# from rest_framework.routers import DefaultRouter
-# from .views import JobViewSet
-
-# router = DefaultRouter()
-# router.register(r'jobs', JobViewSet)
-
-# urlpatterns = [
-#     path('', include(router.urls)),  # ✅ No extra 'api/' here
-# ]
-
 from django.urls import path
 from .views import (
     ResumeUploadView,
     compatible_jobs_page,
     groq_match,
+    paginated_jobs,
 )
 from .resume_views import get_resume
 from .job_views import get_job
@@ -24,4 +14,5 @@ urlpatterns = [
     path("find_jobs_page/", compatible_jobs_page, name="find-compatible-jobs-page"),
     path("get_resume/", get_resume, name="get-resume"),
     path("get_job/", get_job, name="get-job"),
+    path("paginated_jobs/", paginated_jobs, name="paginated-jobs"),
 ]

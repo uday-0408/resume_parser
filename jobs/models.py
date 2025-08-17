@@ -1,5 +1,4 @@
 from django.db import models
-from django.db import models
 
 
 class Resume(models.Model):
@@ -16,7 +15,6 @@ class Job(models.Model):
     location = models.CharField(max_length=255)
     url = models.URLField(blank=True)
     salary = models.CharField(max_length=100, null=True, blank=True)
-    # salary = models.CharField(max_length=100, blank=True)
     job_type = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
     date_posted = models.DateTimeField()

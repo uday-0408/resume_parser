@@ -1,6 +1,6 @@
-import pdfplumber
 from django.http import JsonResponse
 from .models import Resume
+from .utils import extract_text_from_pdf
 
 
 def get_resume(request):
@@ -8,11 +8,9 @@ def get_resume(request):
     try:
         resume = Resume.objects.get(id=resume_id)
         file_path = resume.file.path
-        text = ""
+
         if file_path.lower().endswith(".pdf"):
-            with pdfplumber.open(file_path) as pdf:
-                for page in pdf.pages:
-                    text += page.extract_text() or ""
+            text = extract_text_from_pdf(file_path)
         else:
             # fallback for non-pdf files
             text = open(file_path, encoding="utf-8").read()
